@@ -1,0 +1,26 @@
+# Google Cloud & API credentials (IMPORTANT: NEVER COMMIT THESE)
+credentials.json
+token.json
+.env
+
+# SQLite Database
+*.db
+*.db-journal
+*.db-wal
+
+# Generated Reports (contains sensitive personal order items & tracking details)
+reports/
+
+# Python environment & cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
