@@ -35,9 +35,17 @@ def send_ntfy_notification(
     url = f"https://ntfy.sh/{topic}"
     title = f"AliExpress Tracker: {order_count} Open Order(s)"
 
-    # We want to provide direct link to the latest report via raw.githack.com so it renders as HTML
-    githack_base = repo_url.replace("github.com", "raw.githack.com")
-    report_url = f"{githack_base}/main/reports/latest_report.html"
+    # We want to provide direct link to the latest report via GitHub Pages
+    if "github.com/" in repo_url:
+        parts = repo_url.split("github.com/")[-1].split("/")
+        if len(parts) >= 2:
+            username = parts[0]
+            repo_name = parts[1]
+            report_url = f"https://{username}.github.io/{repo_name}/reports/latest_report.html"
+        else:
+            report_url = f"{repo_url}/blob/main/reports/latest_report.html"
+    else:
+        report_url = f"{repo_url}/blob/main/reports/latest_report.html"
 
     # Format message body
     message = (
