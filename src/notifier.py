@@ -50,15 +50,14 @@ def send_ntfy_notification(
     # Format message body
     message = (
         f"You have {order_count} active orders on AliExpress.\n"
-        f"Status: {status_summary}\n\n"
-        f"Report URL: {report_url}"
+        f"Status: {status_summary}"
     )
 
     headers = {
         "Title": title,
         "Priority": "default",
         "Tags": "package,shopping_bags",
-        "Click": report_url,
+        "Actions": f"view, Full Report, {report_url}",
     }
 
     try:
