@@ -35,8 +35,9 @@ def send_ntfy_notification(
     url = f"https://ntfy.sh/{topic}"
     title = f"AliExpress Tracker: {order_count} Open Order(s)"
 
-    # We want to provide direct link to the latest report
-    report_url = f"{repo_url}/blob/main/reports/latest_report.html"
+    # We want to provide direct link to the latest report via raw.githack.com so it renders as HTML
+    githack_base = repo_url.replace("github.com", "raw.githack.com")
+    report_url = f"{githack_base}/main/reports/latest_report.html"
 
     # Format message body
     message = (
