@@ -7,12 +7,12 @@ The approach mirrors the open-source parcelsapp-cli by dustindog101:
 https://github.com/dustindog101/parcelsapp-cli
 """
 
-import json
 import time
 from dataclasses import dataclass
 from datetime import datetime
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
 # Status keyword → normalized status string (maps parcelsapp event text)
 _STATUS_KEYWORDS: dict[str, str] = {
@@ -236,7 +236,9 @@ def fetch_tracking(tracking_id: str, timeout_ms: int = 20_000) -> TrackingResult
     carrier = _extract_carrier(best)
 
     if not states:
-        return TrackingResult(tracking_id=tracking_id, carrier=carrier, error="NO_STATES")
+        return TrackingResult(
+            tracking_id=tracking_id, carrier=carrier, error="NO_STATES"
+        )
 
     status, latest_event, latest_date = _best_status_from_states(states)
 

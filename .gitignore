@@ -5,11 +5,13 @@ token.json
 
 # SQLite Database
 *.db
+!orders.db
 *.db-journal
 *.db-wal
 
 # Generated Reports (contains sensitive personal order items & tracking details)
-reports/
+reports/*
+!reports/latest_report.html
 
 # Python environment & cache
 __pycache__/

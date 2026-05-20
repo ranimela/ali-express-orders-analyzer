@@ -4,10 +4,10 @@ Archives processed email messages (marking them as read in the Gmail inbox via I
 to prevent double processing, and delivers formatted Markdown reports locally.
 """
 
-from datetime import datetime
 import imaplib
-from pathlib import Path
 import socket
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 socket.setdefaulttimeout(15.0)

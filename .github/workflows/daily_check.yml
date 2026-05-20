@@ -1,0 +1,55 @@
+name: Daily AliExpress Tracker
+
+on:
+  schedule:
+    # 7 AM Israel Time (UTC+3) is 4 AM UTC during Daylight Saving Time (summer).
+    # During winter (Standard Time UTC+2), this runs at 6 AM Israel Time.
+    - cron: '0 4 * * *'
+  workflow_dispatch: # Allows manual runs from the GitHub Actions tab
+
+jobs:
+  run-tracker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Install Playwright browsers and system dependencies
+        run: uv run playwright install chromium --with-deps
+
+      - name: Run tracker pipeline
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NTFY_TOPIC: alexpress-analyzer-ranimel
+          GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
+        run: uv run src/main.py
+
+      - name: Commit and push updated database and HTML report
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f orders.db reports/latest_report.html
+          if git diff --cached --quiet; then
+            echo "No database or report changes to commit."
+          else
+            git commit -m "Auto-update tracking database and latest report [skip ci]"
+            git push
+          fi

@@ -21,7 +21,9 @@ def format_currency(val: float | None) -> str:
     return f"₪{val:.2f}"
 
 
-def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int, int, float]:
+def process_items_and_orders(
+    orders: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], int, int, float]:
     """Process order database records to extract unique physical items,
     resolve their latest statuses, filter out completed items,
     and group the remaining active items by their definitive orders.
@@ -36,14 +38,13 @@ def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[st
           - Count of completed orders
           - Total spend (active + completed) calculated without duplication
     """
-    import json
 
     status_precedence = {
         "unknown": 0,
         "confirmed": 1,
         "shipped": 2,
         "out for delivery": 3,
-        "delivered": 4
+        "delivered": 4,
     }
 
     def clean_item_name(name: str) -> str:
@@ -74,21 +75,23 @@ def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[st
         is_gen = not is_real_order_id(oid)
         items_list = order.get("items", [])
         order_track = order.get("tracking_id")
-        
+
         for item in items_list:
             target_oid = oid
             linked_real_order = None
-            
+
             if is_gen:
                 # Try raw tracking ID matches first
                 for ro in orders:
                     if not is_real_order_id(ro["order_id"]):
                         continue
                     ro_track = ro.get("tracking_id")
-                    if (oid and ro_track == oid) or (order_track and ro_track == order_track):
+                    if (oid and ro_track == oid) or (
+                        order_track and ro_track == order_track
+                    ):
                         linked_real_order = ro["order_id"]
                         break
-            
+
             if linked_real_order:
                 target_oid = linked_real_order
             else:
@@ -98,21 +101,21 @@ def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[st
                     if not is_real_order_id(ro_id):
                         continue
                     ro_items = ro.get("items", [])
-                    
+
                     # Check if item exists in ro
                     has_item = False
                     for ri in ro_items:
                         if is_same_item(item.get("name", ""), ri.get("name", "")):
                             has_item = True
                             break
-                            
+
                     if has_item:
                         if not is_gen:
                             if len(ro_items) > len(items_list) and ro_id[:5] == oid[:5]:
                                 matches.append((ro_id, len(ro_items)))
                         else:
                             matches.append((ro_id, len(ro_items)))
-                
+
                 if matches:
                     if not is_gen:
                         matches.sort(key=lambda x: x[1], reverse=True)
@@ -124,25 +127,31 @@ def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[st
                             score = 0
                             for gi in items_list:
                                 for ri in ro.get("items", []):
-                                    if is_same_item(gi.get("name", ""), ri.get("name", "")):
+                                    if is_same_item(
+                                        gi.get("name", ""), ri.get("name", "")
+                                    ):
                                         score += 1
                                         break
                             size_diff = abs(ro_len - len(items_list))
                             fit_matches.append((ro_id, score, size_diff, ro_len))
-                        fit_matches.sort(key=lambda x: (x[1], -x[2], x[3]), reverse=True)
+                        fit_matches.sort(
+                            key=lambda x: (x[1], -x[2], x[3]), reverse=True
+                        )
                         target_oid = fit_matches[0][0]
 
-            item_instances.append({
-                "item_name": item.get("name", "Unknown Item"),
-                "quantity": item.get("quantity", 1),
-                "price": item.get("price"),
-                "target_order_id": target_oid,
-                "orig_order_id": oid,
-                "status": order.get("latest_status", "Unknown"),
-                "carrier": order.get("carrier"),
-                "tracking_id": order.get("tracking_id"),
-                "last_updated_at": order.get("last_updated_at", "")
-            })
+            item_instances.append(
+                {
+                    "item_name": item.get("name", "Unknown Item"),
+                    "quantity": item.get("quantity", 1),
+                    "price": item.get("price"),
+                    "target_order_id": target_oid,
+                    "orig_order_id": oid,
+                    "status": order.get("latest_status", "Unknown"),
+                    "carrier": order.get("carrier"),
+                    "tracking_id": order.get("tracking_id"),
+                    "last_updated_at": order.get("last_updated_at", ""),
+                }
+            )
 
     # Pass 2: Build tracking-to-real map from resolved instances, and link placeholder items
     tracking_to_real_map = {}
@@ -168,7 +177,6 @@ def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[st
                 inst["target_order_id"] = tracking_to_real_map[orig]
             elif track in tracking_to_real_map:
                 inst["target_order_id"] = tracking_to_real_map[track]
-
 
     # Step 1.5: Track highest status precedence for each target order ID
     order_statuses = {}
@@ -199,34 +207,41 @@ def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[st
 
     # Step 3: Find definitive status/details for each group
     unique_items = []
-    for (item_name, target_oid), insts in groups.items():
+    for (_item_name, target_oid), insts in groups.items():
+
         def get_sort_key(inst):
             prec = status_precedence.get(inst["status"].lower(), 0)
             has_tracking = 1 if inst["tracking_id"] else 0
             has_carrier = 1 if inst["carrier"] else 0
             return (prec, has_tracking, has_carrier, inst["last_updated_at"])
-            
+
         insts.sort(key=get_sort_key, reverse=True)
         def_inst = insts[0]
-        
+
         max_qty = max(i["quantity"] for i in insts)
         longest_name = max((i["item_name"] for i in insts), key=len)
         prices = [i["price"] for i in insts if i["price"] is not None]
         price = prices[0] if prices else None
-        
-        unique_items.append({
-            "name": longest_name,
-            "quantity": max_qty,
-            "price": price,
-            "target_order_id": target_oid,
-            "status": def_inst["status"],
-            "carrier": def_inst["carrier"],
-            "tracking_id": def_inst["tracking_id"]
-        })
+
+        unique_items.append(
+            {
+                "name": longest_name,
+                "quantity": max_qty,
+                "price": price,
+                "target_order_id": target_oid,
+                "status": def_inst["status"],
+                "carrier": def_inst["carrier"],
+                "tracking_id": def_inst["tracking_id"],
+            }
+        )
 
     # Step 4: Calculate stats and group active items
-    total_spend = sum(ui.get("quantity", 1) * ui["price"] for ui in unique_items if ui.get("price") is not None)
-    
+    total_spend = sum(
+        ui.get("quantity", 1) * ui["price"]
+        for ui in unique_items
+        if ui.get("price") is not None
+    )
+
     # Filter active items based on target order status
     active_items = []
     for ui in unique_items:
@@ -234,55 +249,65 @@ def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[st
         overall_status = order_statuses.get(toid, ui["status"]).lower()
         if overall_status not in ("delivered", "completed", "complete"):
             active_items.append(ui)
-    
+
     grouped_orders = {}
     for ui in active_items:
         oid = ui["target_order_id"]
         if oid not in grouped_orders:
             orig_order = next((o for o in orders if o["order_id"] == oid), None)
-            status = order_statuses.get(oid, orig_order["latest_status"] if orig_order else ui["status"])
-            
+            status = order_statuses.get(
+                oid, orig_order["latest_status"] if orig_order else ui["status"]
+            )
+
             grouped_orders[oid] = {
                 "order_id": oid,
                 "latest_status": status,
                 "carrier": None,
                 "tracking_id": None,
-                "items": []
+                "items": [],
             }
         grouped_orders[oid]["items"].append(ui)
 
     # Discard "Unknown Item" placeholder if there are other named items in the same order
-    for oid, o in grouped_orders.items():
+    for _oid, o in grouped_orders.items():
         items = o["items"]
         has_real_items = any(item["name"].lower() != "unknown item" for item in items)
         if has_real_items:
-            o["items"] = [item for item in items if item["name"].lower() != "unknown item"]
+            o["items"] = [
+                item for item in items if item["name"].lower() != "unknown item"
+            ]
 
     # Resolve definitive tracking and carrier for active orders
     for oid, o in grouped_orders.items():
         orig_order = next((x for x in orders if x["order_id"] == oid), None)
-        
-        t_id = orig_order["tracking_id"] if (orig_order and orig_order["tracking_id"]) else None
+
+        t_id = (
+            orig_order["tracking_id"]
+            if (orig_order and orig_order["tracking_id"])
+            else None
+        )
         if not t_id:
             for item in o["items"]:
                 if item.get("tracking_id"):
                     t_id = item["tracking_id"]
                     break
-                    
-        c_name = orig_order["carrier"] if (orig_order and orig_order["carrier"]) else None
+
+        c_name = (
+            orig_order["carrier"] if (orig_order and orig_order["carrier"]) else None
+        )
         if not c_name:
             for item in o["items"]:
                 if item.get("carrier"):
                     c_name = item["carrier"]
                     break
-                    
+
         event_text = orig_order.get("latest_event_text") if orig_order else None
         if not event_text and t_id:
             for ro in orders:
                 if ro.get("tracking_id") == t_id and ro.get("latest_event_text"):
                     event_text = ro["latest_event_text"]
                     break
-                    
+
         o["tracking_id"] = t_id
         o["carrier"] = c_name
         o["latest_event_text"] = event_text
@@ -295,8 +320,12 @@ def process_items_and_orders(orders: list[dict[str, Any]]) -> tuple[list[dict[st
             if o["latest_status"].lower() in ("delivered", "completed", "complete"):
                 completed_order_ids.add(oid)
 
-    return list(grouped_orders.values()), len(active_order_ids), len(completed_order_ids), total_spend
-
+    return (
+        list(grouped_orders.values()),
+        len(active_order_ids),
+        len(completed_order_ids),
+        total_spend,
+    )
 
 
 def build_markdown_report(orders: list[dict[str, Any]]) -> str:
@@ -310,8 +339,10 @@ def build_markdown_report(orders: list[dict[str, Any]]) -> str:
     """
     today_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    active_orders, total_active, total_completed, total_spend = process_items_and_orders(orders)
-    
+    active_orders, total_active, total_completed, total_spend = (
+        process_items_and_orders(orders)
+    )
+
     report_lines = [
         "# 📦 AliExpress Order Status Dashboard",
         f"Generated on: `{today_str}`",
@@ -335,9 +366,11 @@ def build_markdown_report(orders: list[dict[str, Any]]) -> str:
             "out for delivery": 0,
             "shipped": 1,
             "confirmed": 2,
-            "unknown": 3
+            "unknown": 3,
         }
-        active_orders.sort(key=lambda x: status_priority.get(x["latest_status"].lower(), 99))
+        active_orders.sort(
+            key=lambda x: status_priority.get(x["latest_status"].lower(), 99)
+        )
 
         for idx, order in enumerate(active_orders, 1):
             items_lines = []
@@ -375,7 +408,9 @@ def build_markdown_report(orders: list[dict[str, Any]]) -> str:
             elif "cancelled" in status_lower:
                 status_badge = "🔴 Cancelled"
 
-            clean_oid = order["order_id"].replace("TRACKING_", "").replace("GENERIC_", "")
+            clean_oid = (
+                order["order_id"].replace("TRACKING_", "").replace("GENERIC_", "")
+            )
             report_lines.append(f"### {idx}. Order ID: `{clean_oid}`")
             report_lines.append(f"- **Status:** **{status_badge}**")
             report_lines.append(f"- **Tracking ID:** {tracking_str}")
@@ -388,13 +423,11 @@ def build_markdown_report(orders: list[dict[str, Any]]) -> str:
                     f"- **Total Price:** **{format_currency(total_price)}**"
                 )
 
-            last_updated = ""
-            for item in order.get("items", []):
-                orig = next((o for o in orders if o["order_id"] == order["order_id"]), None)
-                if orig:
-                    last_updated = orig["last_updated_at"]
-                    break
-            
+            orig = next(
+                (o for o in orders if o["order_id"] == order["order_id"]), None
+            )
+            last_updated = orig["last_updated_at"] if orig else ""
+
             if last_updated:
                 try:
                     dt = datetime.fromisoformat(last_updated)
@@ -410,11 +443,10 @@ def build_markdown_report(orders: list[dict[str, Any]]) -> str:
     return "\n".join(report_lines)
 
 
-
 def build_html_report(orders: list[dict[str, Any]]) -> str:
     """Construct an incredibly gorgeous, glassmorphic HTML report dashboard from tracked orders.
 
-    Presents active orders in a table, sorted by their tracking status, 
+    Presents active orders in a table, sorted by their tracking status,
     and excludes items details entirely for completed/delivered orders.
 
     Args:
@@ -432,13 +464,17 @@ def build_html_report(orders: list[dict[str, Any]]) -> str:
         "out for delivery": 0,
         "shipped": 1,
         "confirmed": 2,
-        "unknown": 3
+        "unknown": 3,
     }
 
-    active_orders, total_active_orders, total_completed_orders, total_spend = process_items_and_orders(orders)
+    active_orders, total_active_orders, total_completed_orders, total_spend = (
+        process_items_and_orders(orders)
+    )
 
     # Sort active orders by status priority
-    active_orders.sort(key=lambda x: status_priority.get(x["latest_status"].lower(), 99))
+    active_orders.sort(
+        key=lambda x: status_priority.get(x["latest_status"].lower(), 99)
+    )
 
     # 1. Main Styles and HTML Document structure
     html_lines = [
@@ -761,11 +797,15 @@ def build_html_report(orders: list[dict[str, Any]]) -> str:
                 badge_class = "badge-confirmed"
                 badge_emoji = "🔴"
 
-            tracking = order["tracking_id"] if order["tracking_id"] else "Not available yet"
+            tracking = (
+                order["tracking_id"] if order["tracking_id"] else "Not available yet"
+            )
             carrier = order["carrier"] if order["carrier"] else "Not available yet"
 
             event_text = order.get("latest_event_text")
-            event_html = f'<div class="tbl-event-text">{event_text}</div>' if event_text else ''
+            event_html = (
+                f'<div class="tbl-event-text">{event_text}</div>' if event_text else ""
+            )
 
             html_lines.extend(
                 [
@@ -773,7 +813,7 @@ def build_html_report(orders: list[dict[str, Any]]) -> str:
                     f'                        <td><span class="badge {badge_class}">{badge_emoji} {order["latest_status"]}</span></td>',
                     f'                        <td class="tbl-tracking">{tracking}</td>',
                     f'                        <td class="tbl-order-id">{order["order_id"].replace("TRACKING_", "").replace("GENERIC_", "")}</td>',
-                    '                        <td>',
+                    "                        <td>",
                     '                            <table class="nested-items-table">',
                     "                                <tbody>",
                 ]
@@ -801,7 +841,7 @@ def build_html_report(orders: list[dict[str, Any]]) -> str:
                     "                            </table>",
                     "                        </td>",
                     f'                        <td class="tbl-carrier">{carrier}</td>',
-                    f'                        <td>{event_html}</td>',
+                    f"                        <td>{event_html}</td>",
                     "                    </tr>",
                 ]
             )
@@ -817,4 +857,3 @@ def build_html_report(orders: list[dict[str, Any]]) -> str:
     html_lines.extend(["    </div>", "</body>", "</html>"])
 
     return "\n".join(html_lines)
-

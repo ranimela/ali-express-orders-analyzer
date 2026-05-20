@@ -5,11 +5,11 @@ downloads AliExpress emails, and extracts text content for Gemini queries.
 """
 
 import email
-from email import policy
 import html
 import imaplib
 import re
 import socket
+from email import policy
 from typing import Any
 
 # Set a global socket timeout of 45 seconds to prevent infinite hangs on slow networks
@@ -134,14 +134,14 @@ def fetch_imap_emails(
                             for part in msg.walk():
                                 content_type = part.get_content_type()
                                 if content_type == "text/plain":
-                                    body_text = part.get_payload(
-                                        decode=True
-                                    ).decode("utf-8", errors="replace")
+                                    body_text = part.get_payload(decode=True).decode(
+                                        "utf-8", errors="replace"
+                                    )
                                     break
                                 elif content_type == "text/html":
-                                    html_content = part.get_payload(
-                                        decode=True
-                                    ).decode("utf-8", errors="replace")
+                                    html_content = part.get_payload(decode=True).decode(
+                                        "utf-8", errors="replace"
+                                    )
                                     body_text = clean_html(html_content)
 
                         results.append(

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📦 AliExpress Orders Analyzer Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8fafc;
+            --bg-secondary: none;
+            --glass-bg: #ffffff;
+            --glass-border: #e2e8f0;
+            --glass-glow: rgba(99, 102, 241, 0.04);
+            --text-primary: #0f172a;
+            --text-muted: #64748b;
+            --color-emerald: #16a34a;
+            --color-amber: #d97706;
+            --color-sky: #0284c7;
+            --color-indigo: #4f46e5;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2.5rem 1.5rem;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        
+        .header-title h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #4f46e5, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.25rem;
+        }
+        
+        .header-title p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        
+        /* Stats Section */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2.5rem;
+        }
+        
+        .stat-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 1rem;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(99, 102, 241, 0.25);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.35rem;
+        }
+        
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+        
+        /* Section headers */
+        .section-header {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        /* Badges */
+        .badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            border: 1px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            white-space: nowrap;
+        }
+        
+        .badge-confirmed {
+            color: var(--color-sky);
+            background: rgba(2, 132, 199, 0.08);
+            border-color: rgba(2, 132, 199, 0.15);
+        }
+        
+        .badge-shipped {
+            color: var(--color-amber);
+            background: rgba(217, 119, 6, 0.08);
+            border-color: rgba(217, 119, 6, 0.15);
+        }
+        
+        .badge-delivered {
+            color: var(--color-emerald);
+            background: rgba(22, 163, 74, 0.08);
+            border-color: rgba(22, 163, 74, 0.15);
+        }
+        
+        /* Table Layout */
+        .table-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            overflow-x: auto;
+            margin-bottom: 3.5rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        
+        th {
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--glass-border);
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        
+        td {
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--glass-border);
+            vertical-align: middle;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .tbl-order-id {
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+        
+        .tbl-tracking {
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+        
+        .tbl-carrier {
+            white-space: nowrap;
+        }
+        
+        .tbl-event-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.4rem;
+            max-width: 250px;
+            line-height: 1.2;
+            white-space: normal;
+        }
+        
+        /* Items list inside table */
+        .nested-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            background: transparent;
+            min-width: 320px;
+        }
+        
+        .nested-items-table td {
+            padding: 0.35rem 0.5rem;
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--glass-border);
+            vertical-align: middle;
+            background: transparent;
+        }
+        
+        .nested-items-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .nested-item-name {
+            color: var(--text-primary);
+            font-weight: 500;
+            line-height: 1.3;
+            text-align: left;
+        }
+        
+        .nested-item-qty {
+            color: var(--text-muted);
+            text-align: center;
+            white-space: nowrap;
+            width: 40px;
+            font-weight: 500;
+        }
+        
+        .nested-item-price {
+            color: var(--color-indigo);
+            font-weight: 600;
+            text-align: right;
+            white-space: nowrap;
+            width: 70px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-title">
+                <h1>AliExpress Order Status Dashboard</h1>
+                <p>Last Sync: 2026-05-20 13:28:49</p>
+            </div>
+        </header>
+        <!-- Summary Stats Section -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Active Orders In Transit</div>
+                <div class="stat-value" style="color: var(--color-amber);">7</div>
+            </div>
+        </div>
+        
+        <!-- Active In-Transit Orders Section -->
+        <div class="section-header">
+            <span>🚚</span> Active Orders In Transit (Sorted by Status)
+        </div>
+        
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Tracking ID</th>
+                        <th>Order ID</th>
+                        <th>Items Grouped</th>
+                        <th>Logistics Carrier</th>
+                        <th>Latest Update</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge badge-shipped">📦 Out for delivery</span></td>
+                        <td class="tbl-tracking">AP00813722531238</td>
+                        <td class="tbl-order-id">1120551166526739</td>
+                        <td>
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">4pcs/3pcs/1pcs Iron Jewelry Pliers T...</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="nested-item-name">28 oz Shaker Bottles for Prot... Black, 700ML</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="nested-item-name">SPRYCLE 20-100PCS 1/4 Inch Co... SPL11-008-20PCS, 1/4...</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="nested-item-name">50/100pcs Coffee Filter Paper... V01-100pcs</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">₪11.10</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="nested-item-name">Spring Summer New Sports Hats Men's ...</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">₪16.99</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td class="tbl-carrier">Cainiao</td>
+                        <td><div class="tbl-event-text">Your package is now available for pickup at the designated location. To ensure a smooth retrieval, kindly review the pickup instructions shared by the carrier at your earliest convenience.</div></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td class="tbl-tracking">PH8002962839</td>
+                        <td class="tbl-order-id">1120649158876739</td>
+                        <td>
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">Shoes Storage Organizer Collapsible</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td class="tbl-carrier">Cainiao</td>
+                        <td><div class="tbl-event-text">Export clearance success</div></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td class="tbl-tracking">PH8002962840</td>
+                        <td class="tbl-order-id">1120649158896739</td>
+                        <td>
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">Spring Summer New Sports Hats Men's - Dark Blue, Adjustable</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">₪16.96</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td class="tbl-carrier">Cainiao</td>
+                        <td><div class="tbl-event-text">Export clearance success</div></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td class="tbl-tracking">RS1314872426Y</td>
+                        <td class="tbl-order-id">1120551166606739</td>
+                        <td>
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">Water Filter Cartridges, Replacement...</td>
+                                        <td class="nested-item-qty">x4</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td class="tbl-carrier">Israel Post</td>
+                        <td><div class="tbl-event-text">Leaving from departure country/region</div></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td class="tbl-tracking">Not available yet</td>
+                        <td class="tbl-order-id">1120551166566739</td>
+                        <td>
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">Inflatable Foldable Floating ...</td>
+                                        <td class="nested-item-qty">x2</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td class="tbl-carrier">Not available yet</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td class="tbl-tracking">Not available yet</td>
+                        <td class="tbl-order-id">1120550066876739</td>
+                        <td>
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">Dust Bag for Xiaomi Robot Vac...</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td class="tbl-carrier">Not available yet</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td class="tbl-tracking">Not available yet</td>
+                        <td class="tbl-order-id">1120429942906739</td>
+                        <td>
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">C21N1818 Laptop Battery C21N1</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">₪31.61</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td class="tbl-carrier">Not available yet</td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

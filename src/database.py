@@ -131,6 +131,7 @@ def upsert_order(
         # Case B: If order_id is still generic, generate a unique hash-based ID
         if is_generic:
             import hashlib
+
             items_hash = hashlib.md5(items_str.encode("utf-8")).hexdigest()[:10]
             order_id = f"GENERIC_{items_hash}"
 
@@ -175,12 +176,12 @@ def upsert_order(
                 "confirmed": 1,
                 "shipped": 2,
                 "out for delivery": 3,
-                "delivered": 4
+                "delivered": 4,
             }
-            
+
             curr_val = status_precedence.get(current_status.lower(), 0)
             new_val = status_precedence.get(status.lower(), 0)
-            
+
             if curr_val > new_val:
                 final_status = current_status
             else:
@@ -204,11 +205,11 @@ def upsert_order(
                 found_idx = -1
                 for idx, ext_item in enumerate(merged_list):
                     ext_name = ext_item.get("name", "")
-                    
+
                     # Clean names for comparison
                     c1 = new_name.replace("...", "").strip().lower()
                     c2 = ext_name.replace("...", "").strip().lower()
-                    
+
                     is_same = False
                     if c1 == c2:
                         is_same = True
@@ -228,7 +229,9 @@ def upsert_order(
                     if len(new_name) > len(ext_item.get("name", "")):
                         ext_item["name"] = new_name
                     # Merge quantity
-                    ext_item["quantity"] = max(ext_item.get("quantity", 1), new_item.get("quantity", 1))
+                    ext_item["quantity"] = max(
+                        ext_item.get("quantity", 1), new_item.get("quantity", 1)
+                    )
                     # Prefer new price if it is provided
                     if new_item.get("price") is not None:
                         ext_item["price"] = new_item["price"]
@@ -291,7 +294,9 @@ def get_all_orders(db_path: Path = Path("orders.db")) -> list[dict[str, Any]]:
                     "items": json.loads(row["items_json"]),
                     "latest_status": row["latest_status"],
                     "last_updated_at": row["last_updated_at"],
-                    "latest_event_text": row["latest_event_text"] if "latest_event_text" in row.keys() else None,
+                    "latest_event_text": row["latest_event_text"]
+                    if "latest_event_text" in row.keys()
+                    else None,
                 }
             )
         return orders
@@ -339,9 +344,7 @@ def is_email_processed(message_id: str, db_path: Path = Path("orders.db")) -> bo
         return cursor.fetchone() is not None
 
 
-def mark_email_as_processed(
-    message_id: str, db_path: Path = Path("orders.db")
-) -> None:
+def mark_email_as_processed(message_id: str, db_path: Path = Path("orders.db")) -> None:
     """Mark an email message ID as successfully processed.
 
     Args:
@@ -432,7 +435,6 @@ def get_active_tracking_ids(db_path: Path = Path("orders.db")) -> list[tuple[str
     Returns:
         List of (order_id, tracking_id) tuples where tracking_id is not None.
     """
-    active_statuses = ("confirmed", "shipped", "out for delivery")
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -442,8 +444,7 @@ def get_active_tracking_ids(db_path: Path = Path("orders.db")) -> list[tuple[str
         return [
             (row["order_id"], row["tracking_id"])
             for row in rows
-            if row["tracking_id"]
-            and row["tracking_id"].strip()
+            if row["tracking_id"] and row["tracking_id"].strip()
         ]
 
 

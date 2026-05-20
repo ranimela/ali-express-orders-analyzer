@@ -4,15 +4,15 @@ Includes unit and integration tests for database operations, report building,
 and Mock evaluations of Gemini and Gmail components.
 """
 
-import json
 from pathlib import Path
+
 import pytest
 
 from database import (
-    initialize_database,
-    upsert_order,
     get_all_orders,
     get_order_history,
+    initialize_database,
+    upsert_order,
 )
 from reporting import build_markdown_report
 
@@ -168,7 +168,6 @@ def test_build_markdown_report_formatting(temp_db: Path) -> None:
     # Ensure delivered section is gone
     assert "Completed/Delivered Orders" not in report
     assert "Order ID:** `222`" not in report
-
 
 
 def test_database_upsert_generic_and_tracking_fallback(temp_db: Path) -> None:
@@ -389,13 +388,13 @@ def test_sub_order_and_separate_order_resolution() -> None:
     ]
 
     active_grouped, _, _, _ = process_items_and_orders(orders)
-    
+
     # We should have exactly three active grouped orders:
     # 1. 1120551166526739 (the combined order containing 28 oz Shaker Bottle and Sports Hat)
     # 2. 1120649158896739 (the separate sports hat checkout)
     # Note: 1120551166626739 (sub-order) should be completely merged and not appear.
     # Note: PH8002962840 (tracking order) should be merged into 1120649158896739.
-    
+
     grouped_ids = [o["order_id"] for o in active_grouped]
     assert "1120551166526739" in grouped_ids
     assert "1120649158896739" in grouped_ids
@@ -448,21 +447,17 @@ def test_tracking_id_linking_and_placeholder_cleanup() -> None:
     ]
 
     active_grouped, _, _, _ = process_items_and_orders(orders)
-    
+
     # We should have exactly one active order (1120418801296739)
     assert len(active_grouped) == 1
     o = active_grouped[0]
-    
+
     assert o["order_id"] == "1120418801296739"
     # Status should be updated to "Out for delivery"
     assert o["latest_status"] == "Out for delivery"
-    
+
     # Item list should contain WAVLINK but NOT "Unknown Item"
     item_names = [i["name"] for i in o["items"]]
     assert "WAVLINK WiFi 6E Wireless Card" in item_names
     assert "Unknown Item" not in item_names
     assert len(o["items"]) == 1
-
-
-
-

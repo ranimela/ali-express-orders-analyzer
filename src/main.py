@@ -12,19 +12,24 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from database import (
-    get_all_orders,
-    initialize_database,
-    upsert_order,
-    is_email_processed,
-    mark_email_as_processed,
     find_matching_order_for_item,
     get_active_tracking_ids,
+    get_all_orders,
+    initialize_database,
+    is_email_processed,
+    mark_email_as_processed,
     update_status_from_tracker,
+    upsert_order,
 )
-from dispatcher import dispatch_local_report, dispatch_html_report, mark_imap_emails_as_read, print_console_summary
+from dispatcher import (
+    dispatch_html_report,
+    dispatch_local_report,
+    mark_imap_emails_as_read,
+    print_console_summary,
+)
 from extractor import extract_order_from_email, get_gemini_client
 from ingestion import fetch_imap_emails
-from reporting import build_markdown_report, build_html_report
+from reporting import build_html_report, build_markdown_report, process_items_and_orders
 from tracker import fetch_all_tracking
 
 
@@ -46,7 +51,7 @@ def parse_arguments() -> argparse.Namespace:
         "--query",
         type=str,
         default='(FROM "aliexpress" UNSEEN)',
-        help='Custom IMAP search query (default: \'(FROM "aliexpress" UNSEEN)\').',
+        help="Custom IMAP search query (default: '(FROM \"aliexpress\" UNSEEN)').",
     )
     return parser.parse_args()
 
@@ -94,8 +99,9 @@ def main() -> None:
 
     # 3. Ingest raw target emails via IMAP
     from datetime import datetime, timedelta
+
     cutoff_date = (datetime.now() - timedelta(days=30)).strftime("%d-%b-%Y")
-    
+
     query = args.query
     if "SINCE" not in query.upper():
         if query.startswith("(") and query.endswith(")"):
@@ -152,14 +158,21 @@ def main() -> None:
             print("   [Dry Run] Database updates and mark-read skipped.")
         else:
             # Check if order ID is generic and has no tracking ID
-            is_generic = order_record.order_id.lower().strip() in ["unknown", "not provided", "none", ""]
+            is_generic = order_record.order_id.lower().strip() in [
+                "unknown",
+                "not provided",
+                "none",
+                "",
+            ]
             if is_generic and not order_record.tracking_id:
                 # We have a generic order with no tracking ID (e.g. summary update email)
                 # Let's map individual items to existing orders in the database
                 matched_orders = {}
                 unmatched_items = []
                 for item in order_record.items:
-                    matched_id = find_matching_order_for_item(item.name, db_path=db_file)
+                    matched_id = find_matching_order_for_item(
+                        item.name, db_path=db_file
+                    )
                     if matched_id:
                         if matched_id not in matched_orders:
                             matched_orders[matched_id] = []
@@ -168,7 +181,9 @@ def main() -> None:
                         unmatched_items.append(item)
 
                 if matched_orders:
-                    print(f"   [INFO] Resolved {len(matched_orders)} item(s) to existing orders.")
+                    print(
+                        f"   [INFO] Resolved {len(matched_orders)} item(s) to existing orders."
+                    )
 
                 # Upsert matched groups to their respective orders
                 for matched_id, items_list in matched_orders.items():
@@ -207,7 +222,9 @@ def main() -> None:
                 if status_changed:
                     print("   Status change detected and recorded in database history.")
                 else:
-                    print("   Order state matched existing database record. Saved update.")
+                    print(
+                        "   Order state matched existing database record. Saved update."
+                    )
 
             # Record email ID to database processed emails list
             mark_email_as_processed(email["message_id"], db_path=db_file)
@@ -238,7 +255,9 @@ def main() -> None:
                     seen[tid] = oid
             unique_ids = list(seen.keys())
 
-            print(f"\nFetching live tracking status for {len(unique_ids)} shipment(s) from parcelsapp.com...")
+            print(
+                f"\nFetching live tracking status for {len(unique_ids)} shipment(s) from parcelsapp.com..."
+            )
             tracking_results = fetch_all_tracking(unique_ids)
 
             for tid, result in tracking_results.items():
@@ -256,7 +275,9 @@ def main() -> None:
                             db_path=db_file,
                         )
                         if changed:
-                            print(f"  [Tracker] {oid} status updated to: {result.status}")
+                            print(
+                                f"  [Tracker] {oid} status updated to: {result.status}"
+                            )
         else:
             print("\nNo active tracking IDs found for live update.")
 
@@ -274,6 +295,18 @@ def main() -> None:
 
             # Display active summary table on terminal
             print_console_summary(all_orders)
+
+            # Send ntfy notification if there are open orders
+            grouped_active, active_count, _, _ = process_items_and_orders(all_orders)
+            ntfy_topic = os.environ.get("NTFY_TOPIC")
+            if ntfy_topic and active_count > 0:
+                repo_url = os.environ.get(
+                    "GITHUB_REPOSITORY_URL",
+                    "https://github.com/ranimela/ali-express-orders-analyzer",
+                )
+                from notifier import send_ntfy_notification
+
+                send_ntfy_notification(ntfy_topic, grouped_active, repo_url)
         else:
             print("\nNo tracked orders currently exist in the database.")
 

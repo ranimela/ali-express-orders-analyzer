@@ -106,7 +106,6 @@ def extract_order_from_email(
     for model_name in models_to_try:
         max_retries = 3
         base_delay = 30.0
-        success = False
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -134,7 +133,10 @@ def extract_order_from_email(
                     )
                     break  # Break retry loop to try the next model
 
-                if any(k in err_str for k in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
+                if any(
+                    k in err_str
+                    for k in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]
+                ):
                     if attempt < max_retries:
                         print(
                             f"   [TEMPORARY ERROR] Gemini API temporarily busy or rate limited ({err_str[:80]}...). Waiting {base_delay}s before retry (Attempt {attempt}/{max_retries})..."
@@ -143,7 +145,9 @@ def extract_order_from_email(
                         base_delay += 10.0  # increase backoff slightly
                         continue
 
-                print(f"Error during Gemini structured order extraction ({model_name}): {e}")
+                print(
+                    f"Error during Gemini structured order extraction ({model_name}): {e}"
+                )
                 break
 
     return None
