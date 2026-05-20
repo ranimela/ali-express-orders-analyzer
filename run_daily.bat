@@ -8,5 +8,6 @@ echo Running AliExpress Order Status Check...
 echo ----------------------------------------
 uv run src/main.py
 echo ----------------------------------------
-echo Done!
+echo Done! Opening report...
+start reports\latest_report.html
 pause
