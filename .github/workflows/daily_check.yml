@@ -38,7 +38,7 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          NTFY_TOPIC: alexpress-analyzer-ranimela
+          NTFY_TOPIC: aliexpress-analyzer-ranimela
           GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
         run: uv run src/main.py
 
