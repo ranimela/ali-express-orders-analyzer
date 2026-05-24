@@ -179,6 +179,19 @@ def main() -> None:
                 "none",
                 "",
             ]
+            resolved_order_id = order_record.order_id
+            if is_generic:
+                # Try to map to an existing order by checking item names
+                for item in order_record.items:
+                    matched_id = find_matching_order_for_item(
+                        item.name, db_path=db_file
+                    )
+                    if matched_id:
+                        resolved_order_id = matched_id
+                        is_generic = False
+                        print(f"   [INFO] Resolved generic order ID to existing order: {resolved_order_id}")
+                        break
+
             if is_generic and not order_record.tracking_id:
                 # We have a generic order with no tracking ID (e.g. summary update email)
                 # Let's map individual items to existing orders in the database
@@ -227,7 +240,7 @@ def main() -> None:
                 # Standard single-order path
                 items_list = [item.model_dump() for item in order_record.items]
                 status_changed = upsert_order(
-                    order_id=order_record.order_id,
+                    order_id=resolved_order_id,
                     items=items_list,
                     status=order_record.status,
                     tracking_id=order_record.tracking_id,
