@@ -103,19 +103,34 @@ def main() -> None:
     cutoff_date = (datetime.now() - timedelta(days=30)).strftime("%d-%b-%Y")
 
     query = args.query
-    if "SINCE" not in query.upper():
-        if query.startswith("(") and query.endswith(")"):
-            inner = query[1:-1].strip()
-            query = f"({inner} SINCE {cutoff_date})"
-        else:
-            query = f"{query} SINCE {cutoff_date}"
+    queries_to_run = []
+    if query == '(FROM "aliexpress" UNSEEN)':
+        # Default behavior: run both unseen check and "how did it go?" check
+        queries_to_run.append(f'(FROM "aliexpress" UNSEEN SINCE {cutoff_date})')
+        queries_to_run.append(f'(FROM "aliexpress" SUBJECT "how did it go?" SINCE {cutoff_date})')
+    else:
+        # Custom query logic
+        if "SINCE" not in query.upper():
+            if query.startswith("(") and query.endswith(")"):
+                inner = query[1:-1].strip()
+                query = f"({inner} SINCE {cutoff_date})"
+            else:
+                query = f"{query} SINCE {cutoff_date}"
+        queries_to_run.append(query)
 
-    print(f"Connecting to Gmail IMAP and searching query: {query}...")
-    emails = fetch_imap_emails(
-        username=email_user,
-        password=email_password,
-        search_query=query,
-    )
+    emails = []
+    seen_msg_ids = set()
+    for q in queries_to_run:
+        print(f"Connecting to Gmail IMAP and searching query: {q}...")
+        fetched = fetch_imap_emails(
+            username=email_user,
+            password=email_password,
+            search_query=q,
+        )
+        for mail_item in fetched:
+            if mail_item["message_id"] not in seen_msg_ids:
+                seen_msg_ids.add(mail_item["message_id"])
+                emails.append(mail_item)
 
     if not emails:
         print("No new emails found matching the search query.")
