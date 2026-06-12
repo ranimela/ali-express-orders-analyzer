@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,13 +20,13 @@
             --color-sky: #0284c7;
             --color-indigo: #4f46e5;
         }
-        
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
-        
+
         body {
             font-family: 'Outfit', sans-serif;
             background: var(--bg-primary);
@@ -35,12 +36,12 @@
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
         }
-        
+
         header {
             display: flex;
             justify-content: space-between;
@@ -49,7 +50,7 @@
             padding-bottom: 1.5rem;
             border-bottom: 1px solid var(--glass-border);
         }
-        
+
         .header-title h1 {
             font-size: 2rem;
             font-weight: 700;
@@ -58,12 +59,12 @@
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.25rem;
         }
-        
+
         .header-title p {
             color: var(--text-muted);
             font-size: 0.9rem;
         }
-        
+
         /* Stats Section */
         .stats-grid {
             display: grid;
@@ -71,7 +72,7 @@
             gap: 1.25rem;
             margin-bottom: 2.5rem;
         }
-        
+
         .stat-card {
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
@@ -80,13 +81,13 @@
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
             transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
         }
-        
+
         .stat-card:hover {
             transform: translateY(-2px);
             border-color: rgba(99, 102, 241, 0.25);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         }
-        
+
         .stat-label {
             color: var(--text-muted);
             font-size: 0.8rem;
@@ -95,12 +96,12 @@
             letter-spacing: 0.05em;
             margin-bottom: 0.35rem;
         }
-        
+
         .stat-value {
             font-size: 1.75rem;
             font-weight: 700;
         }
-        
+
         /* Section headers */
         .section-header {
             font-size: 1.35rem;
@@ -111,7 +112,7 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         /* Badges */
         .badge {
             font-size: 0.72rem;
@@ -125,25 +126,25 @@
             gap: 0.25rem;
             white-space: nowrap;
         }
-        
+
         .badge-confirmed {
             color: var(--color-sky);
             background: rgba(2, 132, 199, 0.08);
             border-color: rgba(2, 132, 199, 0.15);
         }
-        
+
         .badge-shipped {
             color: var(--color-amber);
             background: rgba(217, 119, 6, 0.08);
             border-color: rgba(217, 119, 6, 0.15);
         }
-        
+
         .badge-delivered {
             color: var(--color-emerald);
             background: rgba(22, 163, 74, 0.08);
             border-color: rgba(22, 163, 74, 0.15);
         }
-        
+
         /* Table Layout */
         .table-card {
             background: var(--glass-bg);
@@ -154,13 +155,13 @@
             overflow-x: auto;
             margin-bottom: 3.5rem;
         }
-        
+
         table {
             width: 100%;
             border-collapse: collapse;
             text-align: left;
         }
-        
+
         th {
             padding: 0.5rem 1rem;
             font-size: 0.75rem;
@@ -172,35 +173,35 @@
             white-space: nowrap;
             vertical-align: middle;
         }
-        
+
         td {
             padding: 0.75rem 1rem;
             font-size: 0.85rem;
             border-bottom: 1px solid var(--glass-border);
             vertical-align: middle;
         }
-        
+
         tr:last-child td {
             border-bottom: none;
         }
-        
+
         .tbl-order-id {
             font-weight: 600;
             color: var(--text-primary);
             white-space: nowrap;
         }
-        
+
         .tbl-tracking {
             font-family: monospace;
             font-size: 0.8rem;
             color: var(--text-primary);
             white-space: nowrap;
         }
-        
+
         .tbl-carrier {
             white-space: nowrap;
         }
-        
+
         .tbl-event-text {
             font-size: 0.75rem;
             color: var(--text-muted);
@@ -209,7 +210,7 @@
             line-height: 1.2;
             white-space: normal;
         }
-        
+
         /* Items list inside table */
         .nested-items-table {
             width: 100%;
@@ -218,7 +219,7 @@
             background: transparent;
             min-width: 320px;
         }
-        
+
         .nested-items-table td {
             padding: 0.35rem 0.5rem;
             font-size: 0.8rem;
@@ -226,18 +227,18 @@
             vertical-align: middle;
             background: transparent;
         }
-        
+
         .nested-items-table tr:last-child td {
             border-bottom: none;
         }
-        
+
         .nested-item-name {
             color: var(--text-primary);
             font-weight: 500;
             line-height: 1.3;
             text-align: left;
         }
-        
+
         .nested-item-qty {
             color: var(--text-muted);
             text-align: center;
@@ -245,7 +246,7 @@
             width: 40px;
             font-weight: 500;
         }
-        
+
         .nested-item-price {
             color: var(--color-indigo);
             font-weight: 600;
@@ -253,28 +254,38 @@
             white-space: nowrap;
             width: 70px;
         }
-        
+
         @media (max-width: 768px) {
             body {
                 padding: 1.5rem 1rem;
             }
+
             header {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 1rem;
             }
+
             .table-card {
                 padding: 0;
                 background: transparent;
                 border: none;
                 box-shadow: none;
             }
-            table, thead, tbody, th, td, tr {
+
+            table,
+            thead,
+            tbody,
+            th,
+            td,
+            tr {
                 display: block;
             }
+
             thead {
                 display: none;
             }
+
             tr {
                 background: var(--glass-bg);
                 border: 1px solid var(--glass-border);
@@ -283,6 +294,7 @@
                 margin-bottom: 1.25rem;
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
             }
+
             td {
                 display: flex;
                 flex-direction: column;
@@ -291,10 +303,12 @@
                 border-bottom: 1px solid rgba(226, 232, 240, 0.5);
                 font-size: 0.9rem;
             }
+
             td:last-child {
                 border-bottom: none;
                 padding-bottom: 0;
             }
+
             td::before {
                 content: attr(data-label);
                 font-size: 0.7rem;
@@ -304,9 +318,11 @@
                 letter-spacing: 0.05em;
                 margin-bottom: 0.35rem;
             }
+
             .nested-items-table {
                 min-width: 100%;
             }
+
             .nested-items-table tr {
                 padding: 0.25rem 0;
                 border: none;
@@ -314,6 +330,7 @@
                 box-shadow: none;
                 margin-bottom: 0;
             }
+
             .nested-items-table td {
                 flex-direction: row;
                 justify-content: space-between;
@@ -321,36 +338,39 @@
                 border-bottom: 1px dashed var(--glass-border);
                 padding: 0.35rem 0;
             }
+
             .nested-items-table td::before {
                 display: none;
             }
+
             .tbl-event-text {
                 max-width: 100%;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
             <div class="header-title">
                 <h1>AliExpress Order Status Dashboard</h1>
-                <p>Last Sync: 2026-05-30 16:09:24</p>
+                <p>Last Sync: 2026-05-24 12:17:05</p>
             </div>
         </header>
         <!-- Summary Stats Section -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">Active Orders In Transit</div>
-                <div class="stat-value" style="color: var(--color-amber);">1</div>
+                <div class="stat-value" style="color: var(--color-amber);">4</div>
             </div>
         </div>
-        
+
         <!-- Active In-Transit Orders Section -->
         <div class="section-header">
             <span>🚚</span> Active Orders In Transit (Sorted by Status)
         </div>
-        
+
         <div class="table-card">
             <table>
                 <thead>
@@ -364,6 +384,66 @@
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
+                        <td data-label="Status"><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td data-label="Tracking ID" class="tbl-tracking">RS1314872426Y</td>
+                        <td data-label="Order ID" class="tbl-order-id">1120551166606739</td>
+                        <td data-label="Items Grouped">
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">Water Filter Cartridges, Repl...</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td data-label="Logistics Carrier" class="tbl-carrier">Israel Post</td>
+                        <td data-label="Latest Update">
+                            <div class="tbl-event-text">Arrived at linehaul office</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td data-label="Status"><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td data-label="Tracking ID" class="tbl-tracking">PH8002962840</td>
+                        <td data-label="Order ID" class="tbl-order-id">1120649158896739</td>
+                        <td data-label="Items Grouped">
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">Spring Summer New Sports Hats</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">₪16.96</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td data-label="Logistics Carrier" class="tbl-carrier">Cainiao</td>
+                        <td data-label="Latest Update">
+                            <div class="tbl-event-text">Arrived at linehaul office</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td data-label="Status"><span class="badge badge-shipped">🚚 Shipped</span></td>
+                        <td data-label="Tracking ID" class="tbl-tracking">PH8002962839</td>
+                        <td data-label="Order ID" class="tbl-order-id">1120649158876739</td>
+                        <td data-label="Items Grouped">
+                            <table class="nested-items-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="nested-item-name">Shoes Storage Organizer Colla...</td>
+                                        <td class="nested-item-qty">x1</td>
+                                        <td class="nested-item-price">N/A</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td data-label="Logistics Carrier" class="tbl-carrier">Cainiao</td>
+                        <td data-label="Latest Update">
+                            <div class="tbl-event-text">Arrived at linehaul office</div>
+                        </td>
+                    </tr>
                     <tr>
                         <td data-label="Status"><span class="badge badge-shipped">🚚 Shipped</span></td>
                         <td data-label="Tracking ID" class="tbl-tracking">Not available yet</td>
@@ -387,4 +467,5 @@
         </div>
     </div>
 </body>
+
 </html>
