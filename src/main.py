@@ -50,8 +50,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--query",
         type=str,
-        default='(FROM "aliexpress" UNSEEN)',
-        help="Custom IMAP search query (default: '(FROM \"aliexpress\" UNSEEN)').",
+        default='(FROM "aliexpress")',
+        help="Custom IMAP search query (default: '(FROM \"aliexpress\")').",
     )
     return parser.parse_args()
 
@@ -105,9 +105,10 @@ def main() -> None:
     query = args.query
     queries_to_run = []
     if query == '(FROM "aliexpress" UNSEEN)':
-        # Default behavior: run both unseen check and "how did it go?" check
-        queries_to_run.append(f'(FROM "aliexpress" UNSEEN SINCE {cutoff_date})')
-        queries_to_run.append(f'(FROM "aliexpress" SUBJECT "how did it go?" SINCE {cutoff_date})')
+        query = '(FROM "aliexpress")'
+
+    if query == '(FROM "aliexpress")':
+        queries_to_run.append(f'(FROM "aliexpress" SINCE {cutoff_date})')
     else:
         # Custom query logic
         if "SINCE" not in query.upper():
