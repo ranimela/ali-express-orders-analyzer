@@ -28,7 +28,7 @@ from dispatcher import (
     print_console_summary,
 )
 from extractor import extract_order_from_email, get_gemini_client
-from ingestion import fetch_imap_emails
+from ingestion import ImapAuthError, fetch_imap_emails
 from reporting import build_html_report, build_markdown_report, process_items_and_orders
 from tracker import fetch_all_tracking
 
@@ -121,17 +121,30 @@ def main() -> None:
 
     emails = []
     seen_msg_ids = set()
-    for q in queries_to_run:
-        print(f"Connecting to Gmail IMAP and searching query: {q}...")
-        fetched = fetch_imap_emails(
-            username=email_user,
-            password=email_password,
-            search_query=q,
-        )
-        for mail_item in fetched:
-            if mail_item["message_id"] not in seen_msg_ids:
-                seen_msg_ids.add(mail_item["message_id"])
-                emails.append(mail_item)
+    try:
+        for q in queries_to_run:
+            print(f"Connecting to Gmail IMAP and searching query: {q}...")
+            fetched = fetch_imap_emails(
+                username=email_user,
+                password=email_password,
+                search_query=q,
+            )
+            for mail_item in fetched:
+                if mail_item["message_id"] not in seen_msg_ids:
+                    seen_msg_ids.add(mail_item["message_id"])
+                    emails.append(mail_item)
+    except ImapAuthError as auth_err:
+        print(f"\n[CRITICAL AUTH ERROR] {auth_err}", file=sys.stderr)
+        ntfy_topic = os.environ.get("NTFY_TOPIC")
+        if ntfy_topic:
+            from notifier import send_auth_failure_notification
+
+            send_auth_failure_notification(
+                topic=ntfy_topic,
+                email_user=email_user,
+                error_details=str(auth_err),
+            )
+        sys.exit(2)
 
     if not emails:
         print("No new emails found matching the search query.")
@@ -190,7 +203,9 @@ def main() -> None:
                     if matched_id:
                         resolved_order_id = matched_id
                         is_generic = False
-                        print(f"   [INFO] Resolved generic order ID to existing order: {resolved_order_id}")
+                        print(
+                            f"   [INFO] Resolved generic order ID to existing order: {resolved_order_id}"
+                        )
                         break
 
             if is_generic and not order_record.tracking_id:

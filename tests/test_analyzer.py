@@ -461,3 +461,142 @@ def test_tracking_id_linking_and_placeholder_cleanup() -> None:
     assert "WAVLINK WiFi 6E Wireless Card" in item_names
     assert "Unknown Item" not in item_names
     assert len(o["items"]) == 1
+
+
+def test_send_auth_failure_notification(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify send_auth_failure_notification constructs correct ntfy request with high priority."""
+    import urllib.request
+    from unittest.mock import MagicMock
+
+    from notifier import send_auth_failure_notification
+
+    captured_request = {}
+
+    def mock_urlopen(req, timeout=10):
+        captured_request["url"] = req.full_url
+        captured_request["method"] = req.method
+        captured_request["headers"] = dict(req.headers)
+        captured_request["data"] = req.data.decode("utf-8")
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        return mock_resp
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+
+    send_auth_failure_notification(
+        topic="test-topic",
+        email_user="test@gmail.com",
+        error_details="Invalid credentials",
+    )
+
+    assert captured_request["url"] == "https://ntfy.sh/test-topic"
+    assert captured_request["method"] == "POST"
+    assert "Priority" in captured_request["headers"]
+    assert captured_request["headers"]["Priority"] == "high"
+    assert "Title" in captured_request["headers"]
+    assert "Gmail App Password Expired" in captured_request["headers"]["Title"]
+    assert "Actions" in captured_request["headers"]
+    assert (
+        "https://myaccount.google.com/apppasswords"
+        in captured_request["headers"]["Actions"]
+    )
+    assert "test@gmail.com" in captured_request["data"]
+
+
+def test_fetch_imap_emails_raises_imap_auth_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify that fetch_imap_emails raises ImapAuthError on authentication failure."""
+    import imaplib
+
+    from ingestion import ImapAuthError, fetch_imap_emails
+
+    class MockIMAP:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def login(self, username, password):
+            raise imaplib.IMAP4.error(
+                b"[AUTHENTICATIONFAILED] Invalid credentials (Failure)"
+            )
+
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", MockIMAP)
+
+    with pytest.raises(ImapAuthError) as exc_info:
+        fetch_imap_emails("user@gmail.com", "bad_password")
+
+    assert "Gmail authentication failed for user@gmail.com" in str(exc_info.value)
+
+
+def test_item_prefix_matching_for_accessories() -> None:
+    """Verify that items with 'for ' prefix and substring variations match correctly."""
+    from reporting import process_items_and_orders
+
+    orders = [
+        {
+            "order_id": "1122849839136739",
+            "latest_status": "Delivered",
+            "carrier": "Israel Post",
+            "tracking_id": "RN0041849266Y",
+            "items": [
+                {
+                    "name": "for Samsung Smart TV Remote:Replacem...",
+                    "quantity": 1,
+                    "price": 12.0,
+                },
+                {"name": "USB Cable", "quantity": 1, "price": 5.0},
+            ],
+            "last_updated_at": "2026-09-17T14:40:00",
+        },
+        {
+            "order_id": "1122849839276739",
+            "latest_status": "Shipped",
+            "carrier": None,
+            "tracking_id": None,
+            "items": [
+                {"name": "Samsung Smart TV Remote", "quantity": 1, "price": 12.0},
+            ],
+            "last_updated_at": "2026-09-11T08:00:00",
+        },
+    ]
+
+    active_grouped, active_count, comp_count, _ = process_items_and_orders(orders)
+
+    # The item should be matched and since the parent is Delivered, active count should be 0
+    assert active_count == 0
+    assert len(active_grouped) == 0
+
+
+def test_main_handles_imap_auth_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that main() catches ImapAuthError, sends notification, and exits with code 2."""
+    from unittest.mock import MagicMock
+
+    import main
+    from ingestion import ImapAuthError
+
+    # Set required environment variables
+    monkeypatch.setenv("EMAIL_USER", "test@gmail.com")
+    monkeypatch.setenv("EMAIL_PASSWORD", "secret")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake_key")
+    monkeypatch.setenv("NTFY_TOPIC", "test-alerts")
+
+    # Mock fetch_imap_emails to raise ImapAuthError
+    def mock_fetch(*args, **kwargs):
+        raise ImapAuthError("Authentication failure")
+
+    monkeypatch.setattr(main, "fetch_imap_emails", mock_fetch)
+
+    # Mock send_auth_failure_notification
+    mock_notifier = MagicMock()
+    monkeypatch.setattr("notifier.send_auth_failure_notification", mock_notifier)
+
+    # Mock get_gemini_client
+    monkeypatch.setattr(main, "get_gemini_client", lambda: MagicMock())
+
+    with pytest.raises(SystemExit) as exc_info:
+        main.main()
+
+    assert exc_info.value.code == 2
+    mock_notifier.assert_called_once()
+    assert mock_notifier.call_args[1]["topic"] == "test-alerts"
+    assert mock_notifier.call_args[1]["email_user"] == "test@gmail.com"

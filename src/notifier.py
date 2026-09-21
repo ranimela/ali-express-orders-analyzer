@@ -41,7 +41,9 @@ def send_ntfy_notification(
         if len(parts) >= 2:
             username = parts[0]
             repo_name = parts[1]
-            report_url = f"https://{username}.github.io/{repo_name}/reports/latest_report.html"
+            report_url = (
+                f"https://{username}.github.io/{repo_name}/reports/latest_report.html"
+            )
         else:
             report_url = f"{repo_url}/blob/main/reports/latest_report.html"
     else:
@@ -49,8 +51,7 @@ def send_ntfy_notification(
 
     # Format message body
     message = (
-        f"You have {order_count} active orders on AliExpress.\n"
-        f"Status: {status_summary}"
+        f"You have {order_count} active orders on AliExpress.\nStatus: {status_summary}"
     )
 
     headers = {
@@ -74,3 +75,49 @@ def send_ntfy_notification(
                 print(f"[Notifier] Failed to send ntfy notification: {response.status}")
     except Exception as e:
         print(f"[Notifier] Error sending ntfy notification: {e}")
+
+
+def send_auth_failure_notification(
+    topic: str, email_user: str, error_details: str = ""
+) -> None:
+    """Send a high-priority push notification when Gmail authentication fails.
+
+    Args:
+        topic: The ntfy.sh topic name.
+        email_user: The user's Gmail address that failed authentication.
+        error_details: Optional error string for additional context.
+    """
+    if not topic:
+        return
+
+    url = f"https://ntfy.sh/{topic}"
+    title = "⚠️ AliExpress Tracker: Gmail App Password Expired"
+
+    message = (
+        f"Gmail IMAP authentication failed for {email_user}.\n"
+        "Your 16-character Google App Password appears to be invalid or expired.\n"
+        "Please generate a new App Password and update your .env and GitHub repository secrets."
+    )
+
+    headers = {
+        "Title": title,
+        "Priority": "high",
+        "Tags": "warning,key,lock",
+        "Actions": "view, Open Google App Passwords, https://myaccount.google.com/apppasswords",
+    }
+
+    try:
+        req = urllib.request.Request(
+            url, data=message.encode("utf-8"), headers=headers, method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            if response.status == 200:
+                print(
+                    f"[Notifier] Auth failure alert sent successfully to topic: {topic}"
+                )
+            else:
+                print(
+                    f"[Notifier] Failed to send auth failure alert: {response.status}"
+                )
+    except Exception as e:
+        print(f"[Notifier] Error sending auth failure alert: {e}")

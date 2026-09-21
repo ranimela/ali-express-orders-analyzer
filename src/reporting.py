@@ -428,9 +428,7 @@ def build_markdown_report(orders: list[dict[str, Any]]) -> str:
                     f"- **Total Price:** **{format_currency(total_price)}**"
                 )
 
-            orig = next(
-                (o for o in orders if o["order_id"] == order["order_id"]), None
-            )
+            orig = next((o for o in orders if o["order_id"] == order["order_id"]), None)
             last_updated = orig["last_updated_at"] if orig else ""
 
             if last_updated:

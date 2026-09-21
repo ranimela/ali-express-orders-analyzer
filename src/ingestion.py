@@ -52,6 +52,12 @@ def clean_html(raw_html: str) -> str:
     return "\n".join(cleaned_lines)
 
 
+class ImapAuthError(Exception):
+    """Raised when IMAP login authentication fails."""
+
+    pass
+
+
 def fetch_imap_emails(
     username: str,
     password: str,
@@ -70,6 +76,9 @@ def fetch_imap_emails(
 
     Returns:
         List of dicts with keys: message_id, subject, sender, date, body_text.
+
+    Raises:
+        ImapAuthError: If authentication with the IMAP server fails.
     """
     results: list[dict[str, Any]] = []
 
@@ -81,6 +90,12 @@ def fetch_imap_emails(
         mail = imaplib.IMAP4_SSL(imap_server, timeout=45.0)
         mail.login(username, clean_password)
     except Exception as e:
+        err_msg = str(e)
+        if "AUTHENTICATIONFAILED" in err_msg or "Invalid credentials" in err_msg:
+            raise ImapAuthError(
+                f"Gmail authentication failed for {username}. "
+                "The App Password appears to be invalid or expired."
+            ) from e
         print(f"[ERROR] IMAP Login failed: {e}")
         return results
 
