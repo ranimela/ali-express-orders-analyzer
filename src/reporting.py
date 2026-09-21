@@ -48,7 +48,10 @@ def process_items_and_orders(
     }
 
     def clean_item_name(name: str) -> str:
-        return name.replace("...", "").strip().lower()
+        s = name.replace("...", "").strip().lower()
+        if s.startswith("for "):
+            s = s[4:].strip()
+        return s
 
     def is_same_item(name1: str, name2: str) -> bool:
         c1 = clean_item_name(name1)
@@ -59,6 +62,8 @@ def process_items_and_orders(
             return True
         if len(c1) >= 10 and len(c2) >= 10:
             if c1.startswith(c2) or c2.startswith(c1):
+                return True
+            if c1 in c2 or c2 in c1:
                 return True
             if len(c1) >= 20 and len(c2) >= 20 and c1[:20] == c2[:20]:
                 return True
