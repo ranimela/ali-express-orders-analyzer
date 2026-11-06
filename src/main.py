@@ -53,6 +53,18 @@ def parse_arguments() -> argparse.Namespace:
         default='(FROM "aliexpress")',
         help="Custom IMAP search query (default: '(FROM \"aliexpress\")').",
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=int(os.environ.get("APP_TIMEOUT_SECONDS", "300")),
+        help="Global timeout in seconds for agent processing (default: 300s / 5 minutes).",
+    )
+    parser.add_argument(
+        "--max-order-age-days",
+        type=int,
+        default=int(os.environ.get("MAX_ORDER_AGE_DAYS", "30")),
+        help="Maximum order/email age in days before omitting from search (default: 30 days).",
+    )
     return parser.parse_args()
 
 
@@ -98,9 +110,15 @@ def main() -> None:
         sys.exit(1)
 
     # 3. Ingest raw target emails via IMAP
-    from datetime import datetime, timedelta
+    import time
+    from datetime import UTC, datetime, timedelta
+    from email.utils import parsedate_to_datetime
 
-    cutoff_date = (datetime.now() - timedelta(days=30)).strftime("%d-%b-%Y")
+    start_time = time.time()
+
+    cutoff_date = (
+        datetime.now(UTC) - timedelta(days=args.max_order_age_days)
+    ).strftime("%d-%b-%Y")
 
     query = args.query
     queries_to_run = []
@@ -146,6 +164,23 @@ def main() -> None:
             )
         sys.exit(2)
 
+    # Automatically omit emails older than max_order_age_days (default 30 days) from processing
+    one_month_ago = datetime.now(UTC) - timedelta(days=args.max_order_age_days)
+    valid_emails = []
+    for email_item in emails:
+        date_str = email_item.get("date")
+        if date_str:
+            try:
+                msg_dt = parsedate_to_datetime(date_str)
+                if msg_dt.tzinfo is None:
+                    msg_dt = msg_dt.replace(tzinfo=UTC)
+                if msg_dt < one_month_ago:
+                    continue
+            except Exception:
+                pass
+        valid_emails.append(email_item)
+    emails = valid_emails
+
     if not emails:
         print("No new emails found matching the search query.")
     else:
@@ -155,6 +190,15 @@ def main() -> None:
 
     # 4. Extract order details and updates using Gemini
     for email in emails:
+        # Check overall agent execution timeout
+        elapsed_sec = time.time() - start_time
+        if elapsed_sec > args.timeout:
+            print(
+                f"\n[AGENT TIMEOUT] Execution limit reached ({elapsed_sec:.1f}s > {args.timeout}s). "
+                "Stopping further email extraction."
+            )
+            break
+
         print("-" * 50)
         print(f"Email ID: {email['message_id']}")
         print(f"Subject:  {email['subject']}")
@@ -166,6 +210,17 @@ def main() -> None:
             # Ensure it is in processed_ids so we mark it as read in IMAP if it got unmarked
             processed_ids.append(email["message_id"])
             continue
+
+        # Skip promotional / coupon emails that contain no shipment status updates
+        if "coupon code" in email["subject"].lower():
+            print("   [INFO] Skipping coupon notification.")
+            mark_email_as_processed(email["message_id"], db_path=db_file)
+            processed_ids.append(email["message_id"])
+            continue
+
+        import time
+
+        time.sleep(1.0)
 
         # Extract structured Pydantic object
         order_record = extract_order_from_email(email["body_text"], gemini_client)
@@ -290,7 +345,17 @@ def main() -> None:
             mark_imap_emails_as_read(email_user, email_password, processed_ids)
 
         # 5a. Live tracking refresh via parcelsapp.com
-        active_pairs = get_active_tracking_ids(db_file)
+        elapsed_sec = time.time() - start_time
+        if elapsed_sec > args.timeout:
+            print(
+                f"\n[AGENT TIMEOUT] Execution limit reached ({elapsed_sec:.1f}s > {args.timeout}s). "
+                "Skipping live carrier tracking."
+            )
+            active_pairs = []
+        else:
+            active_pairs = get_active_tracking_ids(
+                db_file, max_age_days=args.max_order_age_days
+            )
         if active_pairs:
             # Deduplicate tracking IDs (multiple orders may share same tracking ID)
             seen: dict[str, str] = {}

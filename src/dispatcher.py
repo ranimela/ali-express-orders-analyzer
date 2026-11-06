@@ -18,6 +18,7 @@ def mark_imap_emails_as_read(
     password: str,
     message_ids: list[str],
     imap_server: str = "imap.gmail.com",
+    folder: str | None = None,
 ) -> bool:
     """Mark successfully processed email message IDs as read/seen in the mailbox via IMAP.
 
@@ -26,6 +27,7 @@ def mark_imap_emails_as_read(
         password: User's 16-character App Password.
         message_ids: List of IMAP email message IDs.
         imap_server: Address of the IMAP mail server.
+        folder: Optional mailbox name override.
 
     Returns:
         True if marking read succeeded, False otherwise.
@@ -37,7 +39,10 @@ def mark_imap_emails_as_read(
         clean_password = password.replace(" ", "")
         mail = imaplib.IMAP4_SSL(imap_server, timeout=15.0)
         mail.login(username, clean_password)
-        mail.select("inbox")
+
+        from ingestion import select_target_mailbox
+
+        select_target_mailbox(mail, folder=folder, imap_server=imap_server)
 
         for mail_id in message_ids:
             # Store '\Seen' flag to mark message as read

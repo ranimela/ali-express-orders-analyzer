@@ -7,6 +7,7 @@ downloads AliExpress emails, and extracts text content for Gemini queries.
 import email
 import html
 import imaplib
+import os
 import re
 import socket
 from email import policy
@@ -58,12 +59,79 @@ class ImapAuthError(Exception):
     pass
 
 
+def find_all_mail_folder(mail: imaplib.IMAP4_SSL) -> str:
+    """Find the Gmail All Mail folder name, handling localization or custom setups.
+
+    Args:
+        mail: Authenticated IMAP4_SSL client connection.
+
+    Returns:
+        The folder name string to pass to mail.select().
+    """
+    try:
+        status, folders = mail.list()
+        if status == "OK" and folders:
+            for f in folders:
+                decoded = f.decode("utf-8", errors="ignore")
+                if "\\All" in decoded:
+                    # RFC 6154 special-use \All flag
+                    # Format: (\HasNoChildren \All) "/" "[Gmail]/All Mail"
+                    parts = decoded.split(' "/" ')
+                    if len(parts) == 2:
+                        return parts[1].strip()
+    except Exception as e:
+        print(f"[WARNING] Could not list folders for \\All detection: {e}")
+    return '"[Gmail]/All Mail"'
+
+
+def select_target_mailbox(
+    mail: imaplib.IMAP4_SSL,
+    folder: str | None = None,
+    imap_server: str = "imap.gmail.com",
+) -> str:
+    """Select the target mailbox folder, defaulting to Gmail's All Mail to include archived messages.
+
+    Args:
+        mail: Authenticated IMAP4_SSL client connection.
+        folder: Optional explicit mailbox name override.
+        imap_server: IMAP server address.
+
+    Returns:
+        Name of the successfully selected folder.
+    """
+    # 1. Explicit folder override from parameter or env var
+    target_folder = folder or os.environ.get("IMAP_FOLDER")
+    if target_folder:
+        status, _ = mail.select(target_folder)
+        if status == "OK":
+            return target_folder
+        print(
+            f"[WARNING] Could not select configured folder '{target_folder}': {status}"
+        )
+
+    # 2. For Gmail, prioritize the \All special-use folder (All Mail) so archived emails are included
+    if "gmail.com" in imap_server.lower():
+        all_folder = find_all_mail_folder(mail)
+        status, _ = mail.select(all_folder)
+        if status == "OK":
+            return all_folder
+        if all_folder != '"[Gmail]/All Mail"':
+            status, _ = mail.select('"[Gmail]/All Mail"')
+            if status == "OK":
+                return '"[Gmail]/All Mail"'
+
+    # 3. Fallback to standard inbox
+    mail.select("inbox")
+    return "inbox"
+
+
 def fetch_imap_emails(
     username: str,
     password: str,
     imap_server: str = "imap.gmail.com",
     search_query: str = '(FROM "aliexpress" UNSEEN)',
     max_results: int = 150,
+    folder: str | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve target emails from Gmail's IMAP server using an App Password.
 
@@ -73,6 +141,7 @@ def fetch_imap_emails(
         imap_server: Address of the IMAP mail server.
         search_query: Standard IMAP search command string.
         max_results: Maximum number of emails to retrieve.
+        folder: Optional mailbox name to select (defaults to All Mail for Gmail).
 
     Returns:
         List of dicts with keys: message_id, subject, sender, date, body_text.
@@ -100,8 +169,11 @@ def fetch_imap_emails(
         return results
 
     try:
-        # Select active inbox
-        mail.select("inbox")
+        # Select active mailbox (All Mail for Gmail to include archived emails)
+        selected_folder = select_target_mailbox(
+            mail, folder=folder, imap_server=imap_server
+        )
+        print(f"Selected mailbox folder: {selected_folder}")
 
         # Search matching emails
         status, data = mail.search(None, search_query)

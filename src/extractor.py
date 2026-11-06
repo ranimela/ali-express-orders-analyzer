@@ -104,8 +104,8 @@ def extract_order_from_email(
     ]
 
     for model_name in models_to_try:
-        max_retries = 3
-        base_delay = 30.0
+        max_retries = 2
+        base_delay = 2.0
 
         for attempt in range(1, max_retries + 1):
             try:

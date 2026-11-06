@@ -362,16 +362,18 @@ def mark_email_as_processed(message_id: str, db_path: Path = Path("orders.db")) 
 
 
 def find_matching_order_for_item(
-    item_name: str, db_path: Path = Path("orders.db")
+    item_name: str, db_path: Path = Path("orders.db"), max_age_days: int = 30
 ) -> str | None:
     """Find the best existing order containing a similar item.
 
     Analyzes database orders to find matches based on the item name prefix.
-    Prefers active orders over delivered/cancelled ones to match current updates.
+    Prefers active orders over delivered/cancelled ones to match current updates,
+    and automatically omits orders older than max_age_days (default 30 days).
 
     Args:
         item_name: The name of the item to match.
         db_path: Path to the SQLite database file.
+        max_age_days: Maximum age in days before an order is omitted from search (default 30).
 
     Returns:
         The matched order ID or None if not found.
@@ -381,9 +383,20 @@ def find_matching_order_for_item(
     if len(prefix) < 5:
         return None
 
+    from datetime import timedelta
+
+    cutoff_iso = (datetime.now(UTC) - timedelta(days=max_age_days)).isoformat()
+
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT order_id, items_json, latest_status FROM orders")
+        cursor.execute(
+            """
+            SELECT order_id, items_json, latest_status, last_updated_at
+            FROM orders
+            WHERE last_updated_at >= ?
+            """,
+            (cutoff_iso,),
+        )
         rows = cursor.fetchall()
 
         candidates = []
@@ -426,19 +439,35 @@ def find_matching_order_for_item(
         return candidates[0][0]
 
 
-def get_active_tracking_ids(db_path: Path = Path("orders.db")) -> list[tuple[str, str]]:
+def get_active_tracking_ids(
+    db_path: Path = Path("orders.db"), max_age_days: int = 30
+) -> list[tuple[str, str]]:
     """Return (order_id, tracking_id) pairs for all active (non-delivered) orders.
+
+    Orders that are delivered, cancelled, or more than max_age_days old (default 30 days)
+    are automatically omitted from tracking searches.
 
     Args:
         db_path: Path to the SQLite database file.
+        max_age_days: Maximum order age in days before omitting from active search (default 30).
 
     Returns:
         List of (order_id, tracking_id) tuples where tracking_id is not None.
     """
+    from datetime import timedelta
+
+    cutoff_iso = (datetime.now(UTC) - timedelta(days=max_age_days)).isoformat()
+
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT order_id, tracking_id FROM orders WHERE tracking_id IS NOT NULL"
+            """
+            SELECT order_id, tracking_id FROM orders
+            WHERE tracking_id IS NOT NULL
+              AND lower(latest_status) NOT IN ('delivered', 'cancelled')
+              AND last_updated_at >= ?
+            """,
+            (cutoff_iso,),
         )
         rows = cursor.fetchall()
         return [

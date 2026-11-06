@@ -600,3 +600,165 @@ def test_main_handles_imap_auth_error(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_notifier.assert_called_once()
     assert mock_notifier.call_args[1]["topic"] == "test-alerts"
     assert mock_notifier.call_args[1]["email_user"] == "test@gmail.com"
+
+
+def test_find_all_mail_folder() -> None:
+    """Verify that find_all_mail_folder detects the \\All folder from IMAP folder list."""
+    from unittest.mock import MagicMock
+
+    from ingestion import find_all_mail_folder
+
+    mock_mail = MagicMock()
+    mock_mail.list.return_value = (
+        "OK",
+        [
+            b'(\\HasNoChildren) "/" "INBOX"',
+            b'(\\All \\HasNoChildren) "/" "[Gmail]/All Mail"',
+            b'(\\Drafts \\HasNoChildren) "/" "[Gmail]/Drafts"',
+        ],
+    )
+
+    detected = find_all_mail_folder(mock_mail)
+    assert detected == '"[Gmail]/All Mail"'
+
+
+def test_select_target_mailbox_defaults_to_all_mail_for_gmail() -> None:
+    """Verify select_target_mailbox selects All Mail on Gmail to include archived emails."""
+    from unittest.mock import MagicMock
+
+    from ingestion import select_target_mailbox
+
+    mock_mail = MagicMock()
+    mock_mail.list.return_value = (
+        "OK",
+        [b'(\\All \\HasNoChildren) "/" "[Gmail]/All Mail"'],
+    )
+    mock_mail.select.return_value = ("OK", [b"123"])
+
+    selected = select_target_mailbox(mock_mail, imap_server="imap.gmail.com")
+    assert selected == '"[Gmail]/All Mail"'
+    mock_mail.select.assert_called_with('"[Gmail]/All Mail"')
+
+
+def test_select_target_mailbox_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify explicit folder parameter or IMAP_FOLDER environment variable override takes precedence."""
+    from unittest.mock import MagicMock
+
+    from ingestion import select_target_mailbox
+
+    mock_mail = MagicMock()
+    mock_mail.select.return_value = ("OK", [b"50"])
+
+    # Explicit argument
+    selected = select_target_mailbox(mock_mail, folder="CustomArchive")
+    assert selected == "CustomArchive"
+    mock_mail.select.assert_called_with("CustomArchive")
+
+    # Env var
+    monkeypatch.setenv("IMAP_FOLDER", "SpecialFolder")
+    selected_env = select_target_mailbox(mock_mail)
+    assert selected_env == "SpecialFolder"
+    mock_mail.select.assert_called_with("SpecialFolder")
+
+
+def test_get_active_tracking_ids_omits_old_and_delivered_orders(temp_db: Path) -> None:
+    """Verify get_active_tracking_ids omits delivered/cancelled orders and orders older than max_age_days."""
+    import sqlite3
+    from datetime import UTC, datetime, timedelta
+
+    from database import get_active_tracking_ids
+
+    now = datetime.now(UTC)
+    recent_ts = (now - timedelta(days=5)).isoformat()
+    old_ts = (now - timedelta(days=45)).isoformat()
+
+    conn = sqlite3.connect(temp_db)
+    cursor = conn.cursor()
+
+    # 1. Recent active order -> SHOULD BE INCLUDED
+    cursor.execute(
+        """
+        INSERT INTO orders (order_id, tracking_id, carrier, items_json, latest_status, last_updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        ("RECENT_ACTIVE", "TRACK_REC_1", "Cainiao", "[]", "Shipped", recent_ts),
+    )
+
+    # 2. Recent delivered order -> SHOULD BE OMITTED
+    cursor.execute(
+        """
+        INSERT INTO orders (order_id, tracking_id, carrier, items_json, latest_status, last_updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        ("RECENT_DELIVERED", "TRACK_REC_2", "Cainiao", "[]", "Delivered", recent_ts),
+    )
+
+    # 3. Old active order (>30 days) -> SHOULD BE OMITTED
+    cursor.execute(
+        """
+        INSERT INTO orders (order_id, tracking_id, carrier, items_json, latest_status, last_updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        ("OLD_ACTIVE", "TRACK_OLD_1", "Cainiao", "[]", "Shipped", old_ts),
+    )
+    conn.commit()
+    conn.close()
+
+    active_pairs = get_active_tracking_ids(temp_db, max_age_days=30)
+    assert len(active_pairs) == 1
+    assert active_pairs[0] == ("RECENT_ACTIVE", "TRACK_REC_1")
+
+
+def test_find_matching_order_omits_orders_older_than_max_age(temp_db: Path) -> None:
+    """Verify find_matching_order_for_item omits orders older than max_age_days."""
+    import json
+    import sqlite3
+    from datetime import UTC, datetime, timedelta
+
+    from database import find_matching_order_for_item
+
+    now = datetime.now(UTC)
+    old_ts = (now - timedelta(days=45)).isoformat()
+    recent_ts = (now - timedelta(days=5)).isoformat()
+
+    conn = sqlite3.connect(temp_db)
+    cursor = conn.cursor()
+
+    # Old order (>30 days) with item
+    cursor.execute(
+        """
+        INSERT INTO orders (order_id, tracking_id, carrier, items_json, latest_status, last_updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "1120000000000001",
+            "TR_OLD",
+            "Cainiao",
+            json.dumps([{"name": "Ultra Fast Charging Cable 100W"}]),
+            "Shipped",
+            old_ts,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    # Querying with 30 day max age should omit the 45-day-old order
+    matched = find_matching_order_for_item(
+        "Ultra Fast Charging Cable 100W", db_path=temp_db, max_age_days=30
+    )
+    assert matched is None
+
+    # But if updated recently, it should match
+    conn = sqlite3.connect(temp_db)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE orders SET last_updated_at = ? WHERE order_id = ?",
+        (recent_ts, "1120000000000001"),
+    )
+    conn.commit()
+    conn.close()
+
+    matched_recent = find_matching_order_for_item(
+        "Ultra Fast Charging Cable 100W", db_path=temp_db, max_age_days=30
+    )
+    assert matched_recent == "1120000000000001"
